@@ -89,16 +89,18 @@
       //set initial scale such as image cover all the canvas
       if (!this.init) {
         if (this.imgTexture.width) {
+          console.log('canvas', this.canvas.width, this.canvas.height)
+
           var viewportRatio = this.canvas.width / this.canvas.height
           var imageRatio = this.imgTexture.width / this.imgTexture.height
           var scaleRatio = null
 
           if (imageRatio >= viewportRatio) { // wide image
             this.initResizeProperty = 'width'
-            scaleRatio = this.canvas.width / this.imgTexture.width * this.startingZoom // hardcoded startingZoom multiplier
+            scaleRatio = this.canvas.width / this.imgTexture.width * this.startingZoom // startingZoom multiplier
           } else if (imageRatio < viewportRatio) { // tall image
             this.initResizeProperty = 'height'
-            scaleRatio = this.canvas.height / this.imgTexture.height * this.startingZoom // hardcoded startingZoom multiplier
+            scaleRatio = this.canvas.height / this.imgTexture.height * this.startingZoom // startingZoom multiplier
           }
 
           this.position.x = (this.canvas.width - this.imgTexture.width * scaleRatio) / 2 // center horizontal
@@ -114,8 +116,8 @@
             y: this.position.y
           }
 
-          // the initial scale is the scaling ratio * the desired startingZoom
-          this.initialScale = scaleRatio * this.startingZoom
+          // the initial scale is the scaling ratio
+          this.initialScale = scaleRatio // includes the startingZoom
           this.calculateOffset()
 
           // start the impetus so we can move things right away if using momentum
@@ -179,7 +181,6 @@
       var currentScale = this.scale.x
       var newScale = this.scale.x + zoom / 100
 
-      // FIXME: Correct math to account for various initial scales
       // TODO: Make bounceback on zoomed to in or out instead of hard setting
       if (newScale < this.initialScale) { // we are below the minimum zoom (initialZoom)
         this.zoomed = false // we're back at the initial scale
@@ -381,7 +382,7 @@
           boundY = [-this.imgTexture.height * this.scale.y + this.canvas.height, 0]
         }
         else {
-          boundY = [this.position.y - 1, this.position.y + 1]
+          boundY = [this.initPosition.y - 1, this.initPosition.y + 1]
         }
       }
       else {
@@ -389,7 +390,7 @@
           boundX = [-this.imgTexture.width * this.scale.x + this.canvas.width, 0]
         }
         else {
-          boundX = [this.position.x - 1, this.position.x + 1]
+          boundX = [this.initPosition.x - 1, this.initPosition.x + 1]
         }
         boundY = [-this.imgTexture.height * this.scale.y + this.canvas.height, 0]
       }
@@ -473,6 +474,7 @@
     onTouchEnd: function (e) {
       // Check if touchend
 
+      // FIXME: Double tap doesn't yield correct results overall
       // handle double-tap
       if (this.doubletap && !this.startZoom && e.changedTouches.length > 0) {
         var touch = this._getTouch(e.changedTouches[0])
