@@ -34,6 +34,7 @@
     this.initResizeProperty  = null
     this.threshold           = options.threshold || 40
     this.startingZoom        = options.startingZoom || 1
+    this.fullScreen          = options.fullScreen || false
 
     // Init
     this.position = {
@@ -150,15 +151,21 @@
     },
 
 		/**
-		 * Calculates the offset of the canvas position relative to it's container
+		 * Calculates the offset of the canvas position relative to the page
+     * since touch events are always relative to the page
 		 */
     calculateOffset: function () {
-      if (!this.canvas)
-        return this
-      const canvasBox = this.canvas.getBoundingClientRect()
+      if (!this.canvas) return this
 
-      this.offset.x = canvasBox.left
-      this.offset.y = canvasBox.top
+      // no offset if we're using direct client coordinates (full screen canvas)
+      if (!this.fullScreen) {
+        const canvasBox = this.canvas.getBoundingClientRect()
+
+        // caculate the offset from the scroll position
+        this.offset.x = canvasBox.left + window.scrollX
+        this.offset.y = canvasBox.top + window.scrollY
+      }
+
       return this
     },
 
@@ -298,13 +305,28 @@
     // Private
     //
 
+    /**
+     * takes a touchPoint and returns an object with the x,y values based on
+     * if we're full screen or not
+     */
+    _getTouch: function(touchPoint) {
+      var point
+
+      if (this.fullScreen) {
+        point = {x: touchPoint.clientX, y: touchPoint.clientY}
+      } else {
+        point = {x: touchPoint.pageX, y: touchPoint.pageY}
+      }
+      return point
+    },
+
     _gesturePinchZoom: function (event) {
       var zoom = false
 
       if (event.targetTouches.length >= 2) {
-        var p1 = event.targetTouches[0]
-        var p2 = event.targetTouches[1]
-        var zoomScale = Math.sqrt(Math.pow(p2.pageX - p1.pageX, 2) + Math.pow(p2.pageY - p1.pageY, 2)) // euclidian distance
+        var p1 = this._getTouch(event.targetTouches[0])
+        var p2 = this._getTouch(event.targetTouches[1])
+        var zoomScale = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2)) // euclidian distance
 
         if (this.lastZoomScale) {
           zoom = zoomScale - this.lastZoomScale
@@ -412,7 +434,7 @@
     // Events
     //
 
-    onTouchStart: function () {
+    onTouchStart: function (e) {
       this.lastX = null
       this.lastY = null
       this.lastZoomScale = null
@@ -422,13 +444,17 @@
       if (this.zoomed)
         e.preventDefault() //block event propagation
 
+      var p1 = this._getTouch(e.targetTouches[0])
+
       if (e.targetTouches.length == 2) { // pinch
+        var p2 = this._getTouch(e.targetTouches[1])
+
         this.startZoom = true
         if (this.momentum)
           this._destroyImpetus()
 
-        var x = (e.targetTouches[0].pageX + e.targetTouches[1].pageX) / 2
-        var y = (e.targetTouches[0].pageY + e.targetTouches[1].pageY) / 2
+        var x = (p1.x + p2.x) / 2
+        var y = (p1.y + p2.y) / 2
         this.zoom(this._gesturePinchZoom(e), x, y)
       }
       else if (e.targetTouches.length == 1) { // non momentum based movement
@@ -436,8 +462,8 @@
         if (this.momentum) {
           this._createImpetus()
         } else {
-          var relativeX = e.targetTouches[0].pageX //- this.offset.x
-          var relativeY = e.targetTouches[0].pageY //- this.offset.y
+          var relativeX = p1.x - this.offset.x
+          var relativeY = p1.y - this.offset.y
           this.move(relativeX, relativeY)
         }
       }
@@ -446,32 +472,37 @@
 
     onTouchEnd: function (e) {
       // Check if touchend
+
+      // handle double-tap
       if (this.doubletap && !this.startZoom && e.changedTouches.length > 0) {
-        var touch = e.changedTouches[0]
-        var distance = touch.pageX - (this.lastTouchPageX || 0)
+        var touch = this._getTouch(e.changedTouches[0])
+        var distance = touch.x - (this.lastTouchX || 0)
         var now = new Date().getTime()
         var lastTouch = this.lastTouchTime || now + 1 /** the first time this will make delta a negative number */
         var delta = now - lastTouch
+
+        // doubletap is an actual double-tap
         if (distance >= 0 && distance < this.threshold && delta > 0 && delta < 500) {
           this.lastTouchTime = null
-          this.lastTouchPageX = 0
+          this.lastTouchX = 0
           this.startZoom = true
           if (this.zoomed) {
             // FIXME: This needs to reset to initial view
             this.zoom(-400, this.initPosition.x, this.initPosition.y) // FIXME: breaks bounding
           } else {
             // FIXME: This needs max out view according to maxScale
-            this.zoom(this.maxZoom*1000, touch.pageX, touch.pageY)
+            this.zoom(this.maxZoom*1000, touch.x - this.offset.x, touch.y - this.offset.y)
           }
         } else {
           this.lastTouchTime = now
-          this.lastTouchPageX = touch.pageX
+          this.lastTouchX = touch.x
         }
       } else {
         this.lastTouchTime = null
-        this.lastTouchPageX = 0
+        this.lastTouchX = 0
       }
 
+      // resume impetus if applicable
       if (this.momentum) {
         e.preventDefault()
         // if we're zooming
