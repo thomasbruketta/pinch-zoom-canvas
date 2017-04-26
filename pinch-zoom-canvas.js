@@ -39,19 +39,19 @@
     // Init
     this.position = {
       x: 0,
-      y: 0
+      y: 0,
     }
     this.scale = {
       x: 1,
-      y: 1
+      y: 1,
     }
     this.initPosition = {
       x: 0,
-      y: 0
+      y: 0,
     }
     this.offset = {
       x: 0,
-      y: 0
+      y: 0,
     }
 
     this.lastZoomScale = null // what was the last scale?
