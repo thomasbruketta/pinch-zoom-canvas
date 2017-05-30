@@ -20,21 +20,21 @@
     var clientWidth = options.canvas.clientWidth
     var clientHeight = options.canvas.clientHeight
 
-    this.doubletap           = typeof options.doubletap == 'undefined' ? true : options.doubletap
-    this.momentum            = options.momentum
-    this.canvas              = options.canvas
-    this.canvas.width        = clientWidth * 2 // twice the client width
-    this.canvas.height       = clientHeight * 2 // twice the client height
-    this.canvas.style.width  = clientWidth + 'px'
+    this.doubletap = typeof options.doubletap == 'undefined' ? true : options.doubletap
+    this.momentum = options.momentum
+    this.canvas = options.canvas
+    this.canvas.width = clientWidth * 2 // twice the client width
+    this.canvas.height = clientHeight * 2 // twice the client height
+    this.canvas.style.width = clientWidth + 'px'
     this.canvas.style.height = clientHeight + 'px'
-    this.context             = this.canvas.getContext('2d')
-    this.maxZoom             = (options.maxZoom || 2)
-    this.onZoomEnd           = options.onZoomEnd // Callback of zoom end
-    this.onZoom              = options.onZoom // Callback on zoom
-    this.initResizeProperty  = null
-    this.threshold           = options.threshold || 40
-    this.startingZoom        = options.startingZoom || 1
-    this.fullScreen          = options.fullScreen || false
+    this.context = this.canvas.getContext('2d')
+    this.maxZoom = (options.maxZoom || 2)
+    this.onZoomEnd = options.onZoomEnd // Callback of zoom end
+    this.onZoom = options.onZoom // Callback on zoom
+    this.initResizeProperty = null
+    this.threshold = options.threshold || 40
+    this.startingZoom = options.startingZoom || 1
+    this.fullScreen = options.fullScreen || false
 
     // Init
     this.position = {
@@ -62,11 +62,16 @@
     this.running = true // are we actively tracking?
     this.zoomed = false // are we zoomed in?
     this.animating = false // are we animating at all?
+    this.animatingZoom = false // are we animating at all?
+    this.isZoomedPastMin = false // are we zoomed past our minimum scale?
+    this.isZoomedPastMax = false // are we zoomed past our maximum scale?
 
     // Bind events
     this.onTouchStart = this.onTouchStart.bind(this)
     this.onTouchMove = this.onTouchMove.bind(this)
     this.onTouchEnd = this.onTouchEnd.bind(this)
+    this.animateTo = this.animateTo.bind(this)
+    this._getPositionValues = this._getPositionValues.bind(this)
     this.render = this.render.bind(this)
 
     // Load the image
@@ -175,28 +180,47 @@
      * handles zooming in and out
      */
     zoom: function (zoom, touchX, touchY) {
-      if (!zoom) return
+      if (!zoom || this.animatingZoom) return
 
       //new scale
       var currentScale = this.scale.x
-      var newScale = this.scale.x + zoom / 100
+      var newScale = currentScale + zoom / 100
 
       // TODO: Make bounceback on zoomed to in or out instead of hard setting
-      if (newScale < this.initialScale) { // we are below the minimum zoom (initialZoom)
+      if (newScale < this.initialScale && zoom < 0) { // we are below the minimum zoom (initialZoom)
         this.zoomed = false // we're back at the initial scale
-        // this.position.x = this.initPosition.x
-        // this.position.y = this.initPosition.y
-        // this.scale.x = this.initialScale
-        // this.scale.y = this.initialScale
-        newScale = this.initialScale // set to the initialScale
-      } else if (this.maxZoom && newScale > this.maxZoom) { // we are above maximum zoom
+        this.isZoomedPastMin = true
+        this.isZoomedPastMax = false
+        var resistance = (currentScale + this.initialScale) * 4
+        newScale = this.scale.x + zoom / (100 * resistance)
+      } else if (this.maxZoom && newScale > this.maxZoom && zoom > 0) { // we are above maximum zoom
         this.zoomed = true
-        newScale = this.maxZoom // set to maximum zoom
+        this.isZoomedPastMax = true
+        this.isZoomedPastMin = false
       } else { // we are zoomed in between min and max
+        this.isZoomedPastMin = false
+        this.isZoomedPastMax = false
         this.zoomed = true
       }
 
       var deltaScale = newScale - currentScale
+
+      var positionValues = this._getPositionValues(touchX, touchY, deltaScale)
+
+      //finally affectations
+      this.scale.x = newScale
+      this.scale.y = newScale
+      this.position.x += positionValues.x
+      this.position.y += positionValues.y
+
+      // onZoom callback
+      if (this.onZoom) {
+        this.onZoom(newScale, this.zoomed)
+      }
+
+    },
+
+    _getPositionValues: function (touchX, touchY, deltaScale) {
       var currentWidth = this.imgTexture.width * this.scale.x
       var currentHeight = this.imgTexture.height * this.scale.y
       var deltaWidth = this.imgTexture.width * deltaScale
@@ -204,21 +228,33 @@
 
       var tX = (touchX * 2 - this.position.x)
       var tY = (touchY * 2 - this.position.y)
+
       var pX = -tX / currentWidth
       var pY = -tY / currentHeight
 
+      return {
+        x: pX * deltaWidth,
+        y: pY * deltaHeight,
+      }
+    },
 
-      //finally affectations
-      this.scale.x = newScale
-      this.scale.y = newScale
-      this.position.x += pX * deltaWidth
-      this.position.y += pY * deltaHeight
-
-      // onZoom callback
-      if (this.onZoom) {
-        this.onZoom(newScale, this.zoomed)
+    animateTo: function (scale, positionX, positionY) {
+      if (Math.round(this.scale.x * 100) / 100 === scale) {
+        this.animatingZoom = false
+        this.isZoomedPastMin = false
+        this.isZoomedPastMax = false
+        if (this.momentum)
+          this._createImpetus()
+        return
       }
 
+      var rate = 10
+      this.scale.x += (scale - this.scale.x) / rate;
+      this.scale.y += (scale - this.scale.y) / rate;
+      this.position.x += (positionX - this.position.x) / rate;
+      this.position.y += (positionY - this.position.y) / rate;
+
+      requestAnimationFrame(this.animateTo.bind(this, scale, positionX, positionY))
     },
 
     move: function (relativeX, relativeY) {
@@ -310,13 +346,13 @@
      * takes a touchPoint and returns an object with the x,y values based on
      * if we're full screen or not
      */
-    _getTouch: function(touchPoint) {
+    _getTouch: function (touchPoint) {
       var point
 
       if (this.fullScreen) {
-        point = {x: touchPoint.clientX, y: touchPoint.clientY}
+        point = { x: touchPoint.clientX, y: touchPoint.clientY }
       } else {
-        point = {x: touchPoint.pageX, y: touchPoint.pageY}
+        point = { x: touchPoint.pageX, y: touchPoint.pageY }
       }
       return point
     },
@@ -493,7 +529,7 @@
             this.zoom(-400, this.initPosition.x, this.initPosition.y) // FIXME: breaks bounding
           } else {
             // FIXME: This needs max out view according to maxScale
-            this.zoom(this.maxZoom*1000, touch.x - this.offset.x, touch.y - this.offset.y)
+            this.zoom(this.maxZoom * 1000, touch.x - this.offset.x, touch.y - this.offset.y)
           }
         } else {
           this.lastTouchTime = now
@@ -513,6 +549,38 @@
         } else if (!this.zoomed && !this.momentum) { // no momentum and at initial scale otherwise we keep impetus alive to move things around
           this._destroyImpetus()
         }
+      }
+
+      if (this.isZoomedPastMax || this.isZoomedPastMin) {
+        var zoomToValue
+
+        if (this.isZoomedPastMax) {
+          zoomToValue = this.maxZoom
+        }
+        else if (this.isZoomedPastMin) {
+          zoomToValue = this.initialScale
+        }
+        else {
+          return
+        }
+
+        var deltaScale = zoomToValue - this.scale.x
+
+        var p1 = this._getTouch(e.changedTouches[0])
+        var p2 = e.changedTouches[1] && this._getTouch(e.changedTouches[1])
+
+        var lastTouchX = p2 ? (p1.x + p2.x) / 2 : p1.x
+        var lastTouchY = p2 ? (p1.y + p2.y) / 2 : p1.y
+
+        var positionValues = this._getPositionValues(lastTouchX, lastTouchY, deltaScale)
+
+        positionX = this.position.x + positionValues.x
+        positionY = this.position.y + positionValues.y
+
+        if (this.momentum)
+          this._destroyImpetus()
+        this.animatingZoom = true
+        this.animateTo(zoomToValue, positionX, positionY)
       }
 
       // onZoomEnd callback
