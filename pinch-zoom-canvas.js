@@ -141,7 +141,6 @@
         this.position.x, this.position.y,
         this.scale.x * this.imgTexture.width,
         this.scale.y * this.imgTexture.height)
-
       requestAnimationFrame(this.render)
     },
 
@@ -180,7 +179,9 @@
      * handles zooming in and out
      */
     zoom: function (zoom, touchX, touchY) {
-      if (!zoom || this.animatingZoom) return
+      if (!zoom || this.animatingZoom) {
+        return
+      }
 
       //new scale
       var currentScale = this.scale.x
@@ -191,7 +192,7 @@
         this.zoomed = false // we're back at the initial scale
         this.isZoomedPastMin = true
         this.isZoomedPastMax = false
-        var resistance = (currentScale + this.initialScale) * 4
+        var resistance = (currentScale + this.initialScale) * 10
         newScale = this.scale.x + zoom / (100 * resistance)
       } else if (this.maxZoom && newScale > this.maxZoom && zoom > 0) { // we are above maximum zoom
         this.zoomed = true
@@ -239,7 +240,7 @@
     },
 
     animateTo: function (scale, positionX, positionY) {
-      if (Math.round(this.scale.x * 100) / 100 === scale) {
+      if (Math.round(this.scale.x * 1000) / 1000 === scale) {
         this.animatingZoom = false
         this.isZoomedPastMin = false
         this.isZoomedPastMax = false
@@ -248,7 +249,7 @@
         return
       }
 
-      var rate = 10
+      var rate = 6
       this.scale.x += (scale - this.scale.x) / rate;
       this.scale.y += (scale - this.scale.y) / rate;
       this.position.x += (positionX - this.position.x) / rate;
@@ -309,6 +310,7 @@
       } else if (this.momentum && this.lastX && this.lastY) {
         // check if we're within a pixel of x,y and if so we set position and impetus
         // to the whole pixel values so that we don't have infinite "wiggle"
+
         var thresholdX = Math.round(this.lastX) === Math.round(relativeX)
         var thresholdY = Math.round(this.lastY) === Math.round(relativeY)
         if (this.impetus && thresholdX && thresholdY) {
@@ -555,10 +557,10 @@
         var zoomToValue
 
         if (this.isZoomedPastMax) {
-          zoomToValue = this.maxZoom
+          zoomToValue = Math.round(this.maxZoom * 1000) / 1000
         }
         else if (this.isZoomedPastMin) {
-          zoomToValue = this.initialScale
+          zoomToValue = Math.round(this.initialScale * 1000) / 1000
         }
         else {
           return
