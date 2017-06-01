@@ -131,7 +131,6 @@
           this.init = true // done initializing!
         }
       }
-
       // erases the canvas
       this.context.clearRect(0, 0, this.canvas.width, this.canvas.height)
 
@@ -190,17 +189,11 @@
       // TODO: Make bounceback on zoomed to in or out instead of hard setting
       if (newScale < this.initialScale && zoom < 0) { // we are below the minimum zoom (initialZoom)
         this.zoomed = false // we're back at the initial scale
-        this.isZoomedPastMin = true
-        this.isZoomedPastMax = false
         var resistance = (currentScale + this.initialScale) * 10
         newScale = this.scale.x + zoom / (100 * resistance)
       } else if (this.maxZoom && newScale > this.maxZoom && zoom > 0) { // we are above maximum zoom
         this.zoomed = true
-        this.isZoomedPastMax = true
-        this.isZoomedPastMin = false
       } else { // we are zoomed in between min and max
-        this.isZoomedPastMin = false
-        this.isZoomedPastMax = false
         this.zoomed = true
       }
 
@@ -218,7 +211,6 @@
       if (this.onZoom) {
         this.onZoom(newScale, this.zoomed)
       }
-
     },
 
     _getPositionValues: function (touchX, touchY, deltaScale) {
@@ -240,16 +232,15 @@
     },
 
     animateTo: function (scale, positionX, positionY) {
-      if (Math.round(this.scale.x * 1000) / 1000 === scale) {
+      if (Math.round(this.scale.x * 100) / 100 === scale) {
         this.animatingZoom = false
-        this.isZoomedPastMin = false
-        this.isZoomedPastMax = false
         if (this.momentum)
           this._createImpetus()
         return
       }
 
       var rate = 6
+
       this.scale.x += (scale - this.scale.x) / rate;
       this.scale.y += (scale - this.scale.y) / rate;
       this.position.x += (positionX - this.position.x) / rate;
@@ -553,14 +544,17 @@
         }
       }
 
-      if (this.isZoomedPastMax || this.isZoomedPastMin) {
+      var isZoomedPastMin = Math.round(this.scale.x * 100) / 100 < Math.round(this.initialScale * 100) / 100
+      var isZoomedPastMax = Math.round(this.scale.x * 100) / 100 > Math.round(this.maxZoom * 100) / 100
+
+      if (isZoomedPastMin || isZoomedPastMax) {
         var zoomToValue
 
-        if (this.isZoomedPastMax) {
-          zoomToValue = Math.round(this.maxZoom * 1000) / 1000
+        if (isZoomedPastMax) {
+          zoomToValue = Math.round(this.maxZoom * 100) / 100
         }
-        else if (this.isZoomedPastMin) {
-          zoomToValue = Math.round(this.initialScale * 1000) / 1000
+        else if (isZoomedPastMin) {
+          zoomToValue = Math.round(this.initialScale * 100) / 100
         }
         else {
           return
@@ -579,8 +573,10 @@
         positionX = this.position.x + positionValues.x
         positionY = this.position.y + positionValues.y
 
-        if (this.momentum)
+        if (this.momentum && this.impetus) {
           this._destroyImpetus()
+        }
+
         this.animatingZoom = true
         this.animateTo(zoomToValue, positionX, positionY)
       }
