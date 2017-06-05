@@ -31,10 +31,12 @@
     this.maxZoom = (options.maxZoom || 2)
     this.onZoomEnd = options.onZoomEnd // Callback of zoom end
     this.onZoom = options.onZoom // Callback on zoom
+    this.onClose = options.onClose // Callback of zoom end
     this.initResizeProperty = null
     this.threshold = options.threshold || 40
     this.startingZoom = options.startingZoom || 1
     this.fullScreen = options.fullScreen || false
+    this.animateFromY = options.animateFromY * 2
 
     // Init
     this.position = {
@@ -65,12 +67,14 @@
     this.animatingZoom = false // are we animating at all?
     this.isZoomedPastMin = false // are we zoomed past our minimum scale?
     this.isZoomedPastMax = false // are we zoomed past our maximum scale?
+    this.shouldTapClose = false // is a tap?
 
     // Bind events
     this.onTouchStart = this.onTouchStart.bind(this)
     this.onTouchMove = this.onTouchMove.bind(this)
     this.onTouchEnd = this.onTouchEnd.bind(this)
     this.animateTo = this.animateTo.bind(this)
+    this.animateY = this.animateY.bind(this)
     this._getPositionValues = this._getPositionValues.bind(this)
     this.render = this.render.bind(this)
 
@@ -126,7 +130,20 @@
           this.calculateOffset()
 
           // start the impetus so we can move things right away if using momentum
-          if (this.momentum) this._createImpetus()
+          if (this.momentum) {
+            if (this.animateFromY) {
+              // animate from
+              var fromValue = this.animateFromY
+              var toValue = this.position.y
+              var rate = 8 - (Math.abs(fromValue - toValue) / 200) // guestimated rate function
+              this.position.y = this.animateFromY
+              this.animating = true
+              this.animateY(fromValue, toValue, rate, this._createImpetus)
+            }
+            else {
+              this._createImpetus()
+            }
+          }
 
           this.init = true // done initializing!
         }
@@ -249,6 +266,22 @@
       requestAnimationFrame(this.animateTo.bind(this, scale, positionX, positionY))
     },
 
+    animateY: function (fromValue, toValue, rate, callback) {
+      rate = rate || 6
+      if (Math.round(fromValue) === toValue) {
+        if (typeof callback === 'function') {
+          callback.call(this)
+        }
+        this.animating = false
+        return
+      }
+
+      var newValue = this.position.y + (toValue - fromValue) / rate;
+      this.position.y = newValue
+
+      requestAnimationFrame(this.animateY.bind(this, newValue, toValue, rate, callback))
+    },
+
     move: function (relativeX, relativeY) {
       if (!this.momentum && this.lastX && this.lastY) {
         var deltaX = relativeX - this.lastX
@@ -329,6 +362,17 @@
       this._destroyImpetus()
       this.imgTexture = null
       this.canvas = null
+    },
+
+    closeAnimation: function () {
+      var fromValue = this.animateFromY
+      var toValue = this.position.y
+      var rate = 8 - (Math.abs(fromValue - toValue) / 200) // guestimated rate function
+      if (this.impetus)
+        this._destroyImpetus()
+      this.animating = true
+      this.animateY(toValue, fromValue, rate)
+      this.onClose()
     },
 
     //
@@ -445,7 +489,6 @@
       }
     },
 
-
     _setEventListeners: function () {
       this.canvas.addEventListener('touchstart', this.onTouchStart)
       this.canvas.addEventListener('touchmove', this.onTouchMove)
@@ -460,6 +503,10 @@
       return this
     },
 
+    _easeOutCubic: function (currentIteration, startValue, changeInValue, totalIterations) {
+      return changeInValue * (Math.pow(currentIteration / totalIterations - 1, 3) + 1) + startValue
+    },
+
     //
     // Events
     //
@@ -468,9 +515,15 @@
       this.lastX = null
       this.lastY = null
       this.lastZoomScale = null
+      if (!this.zoomed) {
+        this.shouldTapClose = true
+      }
     },
 
     onTouchMove: function (e) {
+      if (this.shouldTapClose)
+        this.shouldTapClose = false
+
       if (this.zoomed)
         e.preventDefault() //block event propagation
 
@@ -502,6 +555,10 @@
 
     onTouchEnd: function (e) {
       // Check if touchend
+      if (this.shouldTapClose && typeof this.onClose === 'function' && !this.animating) {
+        this.closeAnimation()
+        return
+      }
 
       // FIXME: Double tap doesn't yield correct results overall
       // handle double-tap
