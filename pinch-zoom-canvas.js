@@ -59,6 +59,8 @@
     this.lastZoomScale = null // what was the last scale?
     this.lastX = null // what was the last x position?
     this.lastY = null // what was the last y position?
+    this.lastP1 = null
+    this.lastP2 = null
     this.startZoom = false // has zoom started?
     this.init = false // are we initialized?
     this.running = true // are we actively tracking?
@@ -413,6 +415,14 @@
         var p2 = this._getTouch(event.targetTouches[1])
         var zoomScale = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2)) // euclidian distance
 
+        if (p1) {
+          this.lastP1 = p1
+        }
+
+        if (p2) {
+          this.lastP2 = p2
+        }
+
         if (this.lastZoomScale) {
           zoom = zoomScale - this.lastZoomScale
         }
@@ -624,6 +634,11 @@
 
           var p1 = this._getTouch(e.changedTouches[0])
           var p2 = e.changedTouches[1] && this._getTouch(e.changedTouches[1])
+
+          if (!p2) {
+            p1 = this.lastP1
+            p2 = this.lastP2
+          }
 
           var lastTouchX = p2 ? (p1.x + p2.x) / 2 : p1.x
           var lastTouchY = p2 ? (p1.y + p2.y) / 2 : p1.y
