@@ -195,7 +195,7 @@
      * handles zooming in and out
      */
     zoom: function (zoom, touchX, touchY) {
-      if (!zoom || this.animatingZoom) {
+      if (!zoom || this.animatingZoom || this.animating || !this.init) {
         return
       }
 
@@ -250,6 +250,10 @@
 
     animateTo: function (scale, positionX, positionY) {
       if (Math.round(this.scale.x * 100) / 100 === scale) {
+        this.scale.x = scale
+        this.scale.y = scale
+        this.position.x = positionX
+        this.position.y = positionY
         this.animatingZoom = false
         if (this.momentum)
           this._createImpetus()
@@ -269,10 +273,11 @@
     animateY: function (fromValue, toValue, rate, callback) {
       rate = rate || 6
       if (Math.round(fromValue) === toValue) {
+        this.position.y = toValue
+        this.animating = false
         if (typeof callback === 'function') {
           callback.call(this)
         }
-        this.animating = false
         return
       }
 
@@ -283,6 +288,8 @@
     },
 
     move: function (relativeX, relativeY) {
+      if (!this.init) return
+
       if (!this.momentum && this.lastX && this.lastY) {
         var deltaX = relativeX - this.lastX
         var deltaY = relativeY - this.lastY
@@ -330,7 +337,6 @@
             this.position.y = clientHeight - currentHeight
           }
         }
-        this.animating = false // we're done animating!
       } else if (this.momentum && this.lastX && this.lastY) {
         // check if we're within a pixel of x,y and if so we set position and impetus
         // to the whole pixel values so that we don't have infinite "wiggle"
@@ -338,7 +344,6 @@
         var thresholdX = Math.round(this.lastX) === Math.round(relativeX)
         var thresholdY = Math.round(this.lastY) === Math.round(relativeY)
         if (this.impetus && thresholdX && thresholdY) {
-          this.animating = false
           this.position.x = this.lastX = Math.round(relativeX)
           this.position.y = this.lastY = Math.round(relativeY)
           this.impetus.setValues(this.position.x, this.position.y)
@@ -362,16 +367,22 @@
       this._destroyImpetus()
       this.imgTexture = null
       this.canvas = null
+      // this.init = false
     },
 
     closeAnimation: function () {
-      var fromValue = this.animateFromY
-      var toValue = this.position.y
-      var rate = 8 - (Math.abs(fromValue - toValue) / 200) // guestimated rate function
       if (this.impetus)
         this._destroyImpetus()
       this.animating = true
-      this.animateY(toValue, fromValue, rate)
+      if (!this.zoomed) {
+        var fromValue = this.animateFromY
+        var toValue = this.position.y
+        var rate = 8 - (Math.abs(fromValue - toValue) / 200) // guestimated rate function
+        this.animateY(toValue, fromValue, rate)
+      }
+      else {
+        this.animateTo(this.initialScale, this.initPosition.x, this.animateFromY)
+      }
       this.onClose()
     },
 
@@ -515,9 +526,7 @@
       this.lastX = null
       this.lastY = null
       this.lastZoomScale = null
-      if (!this.zoomed) {
-        this.shouldTapClose = true
-      }
+      this.shouldTapClose = true
     },
 
     onTouchMove: function (e) {
@@ -541,7 +550,6 @@
         this.zoom(this._gesturePinchZoom(e), x, y)
       }
       else if (e.targetTouches.length == 1) { // non momentum based movement
-        this.animating = true
         if (this.momentum) {
           this._createImpetus()
         } else {
@@ -603,32 +611,36 @@
 
       var isZoomedPastMin = Math.round(this.scale.x * 100) / 100 < Math.round(this.initialScale * 100) / 100
       var isZoomedPastMax = Math.round(this.scale.x * 100) / 100 > Math.round(this.maxZoom * 100) / 100
+      var positionX
+      var positionY
 
       if (isZoomedPastMin || isZoomedPastMax) {
         var zoomToValue
 
         if (isZoomedPastMax) {
           zoomToValue = Math.round(this.maxZoom * 100) / 100
+
+          var deltaScale = zoomToValue - this.scale.x
+
+          var p1 = this._getTouch(e.changedTouches[0])
+          var p2 = e.changedTouches[1] && this._getTouch(e.changedTouches[1])
+
+          var lastTouchX = p2 ? (p1.x + p2.x) / 2 : p1.x
+          var lastTouchY = p2 ? (p1.y + p2.y) / 2 : p1.y
+
+          var positionValues = this._getPositionValues(lastTouchX, lastTouchY, deltaScale)
+
+          positionX = this.position.x + positionValues.x
+          positionY = this.position.y + positionValues.y
         }
         else if (isZoomedPastMin) {
           zoomToValue = Math.round(this.initialScale * 100) / 100
+          positionX = this.initPosition.x
+          positionY = this.initPosition.y
         }
         else {
           return
         }
-
-        var deltaScale = zoomToValue - this.scale.x
-
-        var p1 = this._getTouch(e.changedTouches[0])
-        var p2 = e.changedTouches[1] && this._getTouch(e.changedTouches[1])
-
-        var lastTouchX = p2 ? (p1.x + p2.x) / 2 : p1.x
-        var lastTouchY = p2 ? (p1.y + p2.y) / 2 : p1.y
-
-        var positionValues = this._getPositionValues(lastTouchX, lastTouchY, deltaScale)
-
-        positionX = this.position.x + positionValues.x
-        positionY = this.position.y + positionValues.y
 
         if (this.momentum && this.impetus) {
           this._destroyImpetus()
