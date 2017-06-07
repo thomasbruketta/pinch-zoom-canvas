@@ -17,8 +17,8 @@
     // Check if exists function requestAnimationFrame
     this._checkRequestAnimationFrame()
 
-    var clientWidth = window.innerWidth
-    var clientHeight = window.innerHeight
+    var clientWidth = window.innerWidth + 4
+    var clientHeight = window.innerHeight + 4
 
     this.doubletap = typeof options.doubletap == 'undefined' ? true : options.doubletap
     this.momentum = options.momentum
@@ -528,10 +528,10 @@
       if (this.initResizeProperty == 'width') {
         boundX = [-this.imgTexture.width * this.scale.x + this.canvas.width + buffer, -buffer]
         if (this.imgTexture.height * this.scale.y > this.canvas.height) {
-          boundY = [-this.imgTexture.height * this.scale.y + this.canvas.height + buffer, -buffer]
+          boundY = [-this.imgTexture.height * this.scale.y + this.canvas.height - buffer, buffer]
         }
         else {
-          boundY = [this.boundY + buffer, this.boundY - buffer]
+          boundY = [this.boundY - buffer, this.boundY - buffer]
         }
       }
       else {
