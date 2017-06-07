@@ -80,15 +80,22 @@
     this._getPositionValues = this._getPositionValues.bind(this)
     this.render = this.render.bind(this)
 
-    // Load the image
-    this.imgTexture = new Image()
-
-    this.imgTexture.onload = function () {
+    // Load the image or use cachedImage
+    if (options.cachedImage) {
+      this.imgTexture = options.cachedImage
       requestAnimationFrame(this.render)
       this._setEventListeners()
-    }.bind(this)
+    }
+    else {
+      this.imgTexture = new Image()
 
-    this.imgTexture.src = options.path
+      this.imgTexture.onload = function () {
+        requestAnimationFrame(this.render)
+        this._setEventListeners()
+      }.bind(this)
+
+      this.imgTexture.src = options.path
+    }
   }
 
   PinchZoomCanvas.prototype = {
