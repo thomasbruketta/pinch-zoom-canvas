@@ -523,25 +523,25 @@
       if (typeof Impetus === 'undefined' || !this.momentum || this.impetus) return
 
       var boundX, boundY
-
+      var buffer = 4
       // setting bounds
       if (this.initResizeProperty == 'width') {
-        boundX = [-this.imgTexture.width * this.scale.x + this.canvas.width, 0]
+        boundX = [-this.imgTexture.width * this.scale.x + this.canvas.width + buffer, -buffer]
         if (this.imgTexture.height * this.scale.y > this.canvas.height) {
-          boundY = [-this.imgTexture.height * this.scale.y + this.canvas.height, 0]
+          boundY = [-this.imgTexture.height * this.scale.y + this.canvas.height + buffer, -buffer]
         }
         else {
-          boundY = [this.boundY - 1, this.boundY + 1]
+          boundY = [this.boundY + buffer, this.boundY - buffer]
         }
       }
       else {
         if (this.imgTexture.width * this.scale.x > this.canvas.width) {
-          boundX = [-this.imgTexture.width * this.scale.x + this.canvas.width, 0]
+          boundX = [-this.imgTexture.width * this.scale.x + this.canvas.width + buffer, -buffer]
         }
         else {
-          boundX = [this.boundX - 1, this.boundX + 1]
+          boundX = [this.boundX + buffer, this.boundX - buffer]
         }
-        boundY = [-this.imgTexture.height * this.scale.y + this.canvas.height, 0]
+        boundY = [-this.imgTexture.height * this.scale.y + this.canvas.height + buffer, -buffer]
       }
 
       this.impetus = new Impetus({
