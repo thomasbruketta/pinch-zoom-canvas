@@ -17,8 +17,8 @@
     // Check if exists function requestAnimationFrame
     this._checkRequestAnimationFrame()
 
-    var clientWidth = window.innerWidth + 4
-    var clientHeight = window.innerHeight + 4
+    var clientWidth = window.innerWidth
+    var clientHeight = window.innerHeight
 
     this.doubletap = typeof options.doubletap == 'undefined' ? true : options.doubletap
     this.momentum = options.momentum
@@ -148,7 +148,7 @@
               // need to break out into separate functions!!!!!
               var currentImageWidth = this.imgTexture.width * scaleRatio // getCurrentWidth()
               var currentImageHeight = this.imgTexture.height * scaleRatio // getCurrentHeight()
-              var scale = this.canvas.height / currentImageHeight // scale needed to animate image height to canvas height
+              var scale = (this.canvas.height + 4) / currentImageHeight // scale needed to animate image height to canvas height + 4 (buffer)
 
               // get the offset needed to keep image centered while scaling:
               var scalePositionXOffset = ((currentImageWidth * scale) - currentImageWidth) / 2 // getDeltaPositionX()
@@ -392,9 +392,11 @@
 
         var thresholdX = Math.round(this.lastX) === Math.round(relativeX)
         var thresholdY = Math.round(this.lastY) === Math.round(relativeY)
+
         if (this.impetus && thresholdX && thresholdY) {
           this.position.x = this.lastX = Math.round(relativeX)
           this.position.y = this.lastY = Math.round(relativeY)
+
           this.impetus.setValues(this.position.x, this.position.y)
         } else {
           this.position.x = relativeX
@@ -523,26 +525,32 @@
       if (typeof Impetus === 'undefined' || !this.momentum || this.impetus) return
 
       var boundX, boundY
-      var buffer = 4
+
       // setting bounds
       if (this.initResizeProperty == 'width') {
-        boundX = [-this.imgTexture.width * this.scale.x + this.canvas.width + buffer, -buffer]
+        boundX = [-this.imgTexture.width * this.scale.x + this.canvas.width, 0]
         if (this.imgTexture.height * this.scale.y > this.canvas.height) {
-          boundY = [-this.imgTexture.height * this.scale.y + this.canvas.height - buffer, buffer]
+          boundY = [-this.imgTexture.height * this.scale.y + this.canvas.height, 0]
         }
         else {
-          boundY = [this.boundY - buffer, this.boundY - buffer]
+          boundY = [this.boundY - 1, this.boundY + 1]
         }
       }
       else {
         if (this.imgTexture.width * this.scale.x > this.canvas.width) {
-          boundX = [-this.imgTexture.width * this.scale.x + this.canvas.width + buffer, -buffer]
+          boundX = [-this.imgTexture.width * this.scale.x + this.canvas.width, 0]
         }
         else {
-          boundX = [this.boundX + buffer, this.boundX - buffer]
+          boundX = [this.boundX - 1, this.boundX + 1]
         }
-        boundY = [-this.imgTexture.height * this.scale.y + this.canvas.height + buffer, -buffer]
+        boundY = [-this.imgTexture.height * this.scale.y + this.canvas.height, 0]
       }
+
+      // Impetus hack, so it actually stays within boundaries
+      boundX[0] += 2
+      boundX[1] -= 2
+      boundY[0] += 2.5
+      boundY[1] -= 2.5
 
       this.impetus = new Impetus({
         source: this.canvas,
