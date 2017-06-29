@@ -56,7 +56,7 @@
       y: 0,
     }
 
-    this.minZoom = null
+    this.initialScale = null
     this.boundX = null
     this.boundY = null
 
@@ -146,6 +146,8 @@
           this.initialScale = scaleRatio // includes the startingZoom
           this.calculateOffset()
 
+          this.minZoom = this.initialScale
+
           // start the impetus so we can move things right away if using momentum
           if (this.momentum) {
             if (this.animateFromY) {
@@ -156,25 +158,29 @@
 
               // get the offset needed to keep image centered while scaling:
               var scalePositionXOffset = ((currentImageWidth * scale) - currentImageWidth) / 2 // getDeltaPositionX()
-              var scalePositionYOffset = ((currentImageHeight * scale) - currentImageHeight) / 2// getDeltaPositionY()
+              var scalePositionYOffset = ((currentImageHeight * scale) - currentImageHeight) / 2 // getDeltaPositionY()
 
               var fromX = this.initPosition.x
               var toX = this.initPosition.x - scalePositionXOffset
 
-              // animate from
               var fromY = this.animateFromY
               var toY = this.position.y - scalePositionYOffset
-
-              // var rate = 8 - (Math.abs(fromY - toY) / 200) // guestimated rate timing
-
-              this.position.y = this.animateFromY
-              this.animating = true
 
               var fromZoom = this.initialScale
               var toZoom = this.initialScale * scale
 
-              // this.animateZoom(fromZoom, toZoom, fromX, toX, fromY, toY, rate, this._createImpetus) // simplify?
-              this.animateTo(fromZoom, toZoom, fromX, toX, fromY, toY, 600, this._createImpetus)
+
+              this.minZoom = toZoom
+              this.initialPositionX = toX // need better names
+              this.initialPositionY = toY // for these variables (animated initial positions? min zoom positions? )
+
+              // set y to starting position
+              this.position.y = this.animateFromY
+
+              // let everyone know we're animating
+              this.animating = true
+
+              this.animateTo(fromZoom, toZoom, fromX, toX, fromY, toY, 400, this._createImpetus)
             }
             else {
               this._createImpetus()
@@ -241,9 +247,9 @@
       var newScale = currentScale + zoom / 100
 
       // TODO: Make bounceback on zoomed to in or out instead of hard setting
-      if (newScale < this.initialScale && zoom < 0) { // we are below the minimum zoom (initialZoom)
+      if (newScale < this.minZoom && zoom < 0) { // we are below the minimum zoom (initialZoom)
         this.zoomed = false // we're back at the initial scale
-        var resistance = (currentScale + this.initialScale) * 10
+        var resistance = (currentScale + this.minZoom) * 10
         newScale = this.scale.x + zoom / (100 * resistance)
       } else if (this.maxZoom && newScale > this.maxZoom && zoom > 0) { // we are above maximum zoom
         this.zoomed = true
@@ -668,6 +674,7 @@
 
       var isZoomedPastMin = Math.round(this.scale.x * 100) / 100 < Math.round(this.minZoom * 100) / 100
       var isZoomedPastMax = Math.round(this.scale.x * 100) / 100 > Math.round(this.maxZoom * 100) / 100
+
       var positionX
       var positionY
 
@@ -697,8 +704,8 @@
         }
         else if (isZoomedPastMin) {
           zoomToValue = Math.round(this.minZoom * 100) / 100
-          positionX = this.boundX
-          positionY = this.boundY
+          positionX = this.initialPositionX
+          positionY = this.initialPositionY
         }
         else {
           return
@@ -712,8 +719,6 @@
 
         var duration = 300
         this.animateTo(this.scale.x, zoomToValue, this.position.x, positionX, this.position.y, positionY, duration)
-
-        // this.animateTo(zoomToValue, positionX, positionY)
       }
 
       // onZoomEnd callback
