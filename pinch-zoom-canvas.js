@@ -70,7 +70,7 @@
     this.running = true // are we actively tracking?
     this.zoomed = false // are we zoomed in?
     this.animating = false // are we animating at all?
-    this.animatingZoom = false // are we animating at all?
+    // this.animatingZoom = false // are we animating at all?
     this.isZoomedPastMin = false // are we zoomed past our minimum scale?
     this.isZoomedPastMax = false // are we zoomed past our maximum scale?
     this.shouldTapClose = false // is a tap?
@@ -80,9 +80,13 @@
     this.onTouchMove = this.onTouchMove.bind(this)
     this.onTouchEnd = this.onTouchEnd.bind(this)
     this.animateTo = this.animateTo.bind(this)
-    this.animateZoom = this.animateZoom.bind(this)
+    // this.animateZoom = this.animateZoom.bind(this)
     this._getPositionValues = this._getPositionValues.bind(this)
     this.render = this.render.bind(this)
+    this.closeAnimation = this.closeAnimation.bind(this)
+
+    this.currentIterationTime = 0
+    this.startTime = null
 
     // Load the image or use cachedImage
     if (options.cachedImage) {
@@ -161,7 +165,7 @@
               var fromY = this.animateFromY
               var toY = this.position.y - scalePositionYOffset
 
-              var rate = 8 - (Math.abs(fromY - toY) / 200) // guestimated rate timing
+              // var rate = 8 - (Math.abs(fromY - toY) / 200) // guestimated rate timing
 
               this.position.y = this.animateFromY
               this.animating = true
@@ -169,7 +173,8 @@
               var fromZoom = this.initialScale
               var toZoom = this.initialScale * scale
 
-              this.animateZoom(fromZoom, toZoom, fromX, toX, fromY, toY, rate, this._createImpetus) // simplify?
+              // this.animateZoom(fromZoom, toZoom, fromX, toX, fromY, toY, rate, this._createImpetus) // simplify?
+              this.animateTo(fromZoom, toZoom, fromX, toX, fromY, toY, 600, this._createImpetus)
             }
             else {
               this._createImpetus()
@@ -187,7 +192,8 @@
         this.imgTexture,
         this.position.x, this.position.y,
         this.scale.x * this.imgTexture.width,
-        this.scale.y * this.imgTexture.height)
+        this.scale.y * this.imgTexture.height
+      )
       requestAnimationFrame(this.render)
     },
 
@@ -226,7 +232,7 @@
      * handles zooming in and out
      */
     zoom: function (zoom, touchX, touchY) {
-      if (!zoom || this.animatingZoom || this.animating || !this.init) {
+      if (!zoom || this.animating || !this.init) {
         return
       }
 
@@ -279,65 +285,45 @@
       }
     },
 
-    animateTo: function (scale, positionX, positionY) {
-      if (Math.round(this.scale.x * 100) / 100 === scale) {
-        this.scale.x = scale
-        this.scale.y = scale
-        this.position.x = positionX
-        this.position.y = positionY
-        this.animatingZoom = false
-        if (this.momentum)
-          this._createImpetus()
-        return
+    animateTo: function (startScale, endScale, startX, endX, startY, endY, duration, callback) {
+      if (!this.startTime) {
+        this.startTime = performance.now()
+        this.currentIterationTime = 0
+      }
+      else {
+        this.currentIterationTime = performance.now() - this.startTime
       }
 
-      var rate = 6
-
-      this.scale.x += (scale - this.scale.x) / rate;
-      this.scale.y += (scale - this.scale.y) / rate;
-      this.position.x += (positionX - this.position.x) / rate;
-      this.position.y += (positionY - this.position.y) / rate;
-
-      requestAnimationFrame(this.animateTo.bind(this, scale, positionX, positionY))
-    },
-
-    animateZoom: function (fromZoom, toZoom, fromX, toX, fromY, toY, rate, callback) {
-      rate = rate || 6
-      if (Math.round(fromY) === toY) {
-        this.position.y = toY
-        this.position.x = toX
-        this.scale.x = toZoom
-        this.scale.y = toZoom
-
-        this.boundX = toX
-        this.boundY = toY
-        this.minZoom = toZoom
-
+      if (this.currentIterationTime > duration) {
+        this.scale.x = endScale
+        this.scale.y = endScale
+        this.position.x = endX
+        this.position.y = endY
         this.animating = false
+        // reset startTime for next animation
+        this.startTime = null
         if (typeof callback === 'function') {
           callback.call(this)
         }
         return
       }
 
-      // animate y position
-      var newY = this.position.y + (toY - fromY) / rate
-      this.position.y = newY
+      var scale = this._easeInOutQuad(this.currentIterationTime, startScale, endScale - startScale, duration)
+      var x = this._easeInOutQuad(this.currentIterationTime, startX, endX - startX, duration)
+      var y = this._easeInOutQuad(this.currentIterationTime, startY, endY - startY, duration)
 
-      // animate x position
-      var newX = this.position.x + (toX - fromX) / rate
-      this.position.x = newX
+      this.scale.x = scale
+      this.scale.y = scale
+      this.position.x = x
+      this.position.y = y
 
-      // animate scale
-      var newZoom = this.scale.x + (toZoom - fromZoom) / rate
-      this.scale.x = newZoom
-      this.scale.y = newZoom
-
-      requestAnimationFrame(this.animateZoom.bind(this, newZoom, toZoom, newX, toX, newY, toY, rate, callback))
+      requestAnimationFrame(this.animateTo.bind(this, startScale, endScale, startX, endX, startY, endY, duration, callback))
     },
 
     move: function (relativeX, relativeY) {
-      if (!this.init) return
+      if (!this.init || this.animating) {
+        return
+      }
 
       if (!this.momentum && this.lastX && this.lastY) {
         var deltaX = relativeX - this.lastX
@@ -422,26 +408,21 @@
     },
 
     closeAnimation: function () {
-      if (this.impetus)
-        this._destroyImpetus()
+      this._destroyImpetus()
+
       this.animating = true
-      if (!this.zoomed) {
 
-        var fromX = this.position.x
-        var toX = this.initPosition.x
+      var startScale = this.scale.x
+      var endScale = this.initialScale
 
-        var fromY = this.position.y
-        var toY = this.animateFromY
+      var startX = this.position.x
+      var endX = this.initPosition.x
 
-        var rate = 8 - (Math.abs(fromY - toY) / 200) // guestimated rate function
+      var startY = this.position.y
+      var endY = this.animateFromY
 
-        var fromZoom = this.scale.x
-        var toZoom = this.initialScale
-        this.animateZoom(fromZoom, toZoom, fromX, toX, fromY, toY, rate)
-      }
-      else {
-        this.animateTo(this.initialScale, this.initPosition.x, this.animateFromY)
-      }
+      this.animateTo(startScale, endScale, startX, endX, startY, endY, 400)
+
       this.onClose()
     },
 
@@ -522,7 +503,9 @@
 
 
     _createImpetus: function () {
-      if (typeof Impetus === 'undefined' || !this.momentum || this.impetus) return
+      if (typeof Impetus === 'undefined' || !this.momentum || this.impetus) {
+        return
+      }
 
       var boundX, boundY
 
@@ -549,8 +532,7 @@
       // Impetus hack, so it actually stays within boundaries
       boundX[0] += 2
       boundX[1] -= 2
-      boundY[0] += 2.5
-      boundY[1] -= 2.5
+      boundY[0] += 2
 
       this.impetus = new Impetus({
         source: this.canvas,
@@ -568,8 +550,7 @@
 
     _destroyImpetus: function () {
       if (this.impetus && this.impetus.destroy) {
-        this.impetus.destroy()
-        this.impetus = null
+        this.impetus = this.impetus.destroy()
       }
     },
 
@@ -587,8 +568,11 @@
       return this
     },
 
-    _easeOutCubic: function (currentIteration, startValue, changeInValue, totalIterations) {
-      return changeInValue * (Math.pow(currentIteration / totalIterations - 1, 3) + 1) + startValue
+    _easeInOutQuad: function (currentIteration, startValue, changeInValue, totalIterations) {
+      if ((currentIteration /= totalIterations / 2) < 1) {
+        return changeInValue / 2 * currentIteration * currentIteration + startValue;
+      }
+      return -changeInValue / 2 * ((--currentIteration) * (currentIteration - 2) - 1) + startValue;
     },
 
     //
@@ -724,8 +708,12 @@
           this._destroyImpetus()
         }
 
-        this.animatingZoom = true
-        this.animateTo(zoomToValue, positionX, positionY)
+        this.animating = true
+
+        var duration = 300
+        this.animateTo(this.scale.x, zoomToValue, this.position.x, positionX, this.position.y, positionY, duration)
+
+        // this.animateTo(zoomToValue, positionX, positionY)
       }
 
       // onZoomEnd callback
