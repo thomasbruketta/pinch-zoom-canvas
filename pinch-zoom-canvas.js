@@ -707,18 +707,17 @@
           positionX = this.initialPositionX
           positionY = this.initialPositionY
         }
-        else {
-          return
-        }
 
         if (this.momentum && this.impetus) {
           this._destroyImpetus()
         }
 
-        this.animating = true
-
         var duration = 300
-        this.animateTo(this.scale.x, zoomToValue, this.position.x, positionX, this.position.y, positionY, duration)
+
+        if (!this.animating) {
+          this.animating = true
+          this.animateTo(this.scale.x, zoomToValue, this.position.x, positionX, this.position.y, positionY, duration, this._createImpetus)
+        }
       }
 
       // onZoomEnd callback
