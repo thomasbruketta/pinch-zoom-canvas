@@ -379,7 +379,7 @@
           }
         }
       } else if (this.momentum && this.lastX && this.lastY) {
-        // check if we're within a pixel of x,y and if so we set position and impetus
+        // check if we're within a pixel of x,y and if so we set position
         // to the whole pixel values so that we don't have infinite "wiggle"
 
         var thresholdX = Math.round(this.lastX) === Math.round(relativeX)
@@ -388,8 +388,6 @@
         if (this.impetus && thresholdX && thresholdY) {
           this.position.x = this.lastX = Math.round(relativeX)
           this.position.y = this.lastY = Math.round(relativeY)
-
-          this.impetus.setValues(this.position.x, this.position.y)
         } else {
           this.position.x = relativeX
           this.position.y = relativeY
