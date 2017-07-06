@@ -308,6 +308,9 @@
         this.animating = false
         // reset startTime for next animation
         this.startTime = null
+        if (this.impetus) {
+          this.impetus.setValues(this.position.x, this.position.y)
+        }
         if (typeof callback === 'function') {
           callback.call(this)
         }
@@ -708,15 +711,22 @@
           positionY = this.initialPositionY
         }
 
-        if (this.momentum && this.impetus) {
-          this._destroyImpetus()
-        }
-
         var duration = 300
 
         if (!this.animating) {
           this.animating = true
-          this.animateTo(this.scale.x, zoomToValue, this.position.x, positionX, this.position.y, positionY, duration, this._createImpetus)
+          this.animateTo(this.scale.x, zoomToValue, this.position.x, positionX, this.position.y, positionY, duration)
+        }
+      } else if (this.startZoom) {
+        // Handle zooming out with margins visible
+        var boundX = -this.imgTexture.width * this.scale.x + this.canvas.width
+        var boundY = -this.imgTexture.height * this.scale.y + this.canvas.height
+        var clampedX = Math.max(boundX, Math.min(0, this.position.x))
+        var clampedY = Math.max(boundY, Math.min(0, this.position.y))
+
+        if (!this.animating && (this.position.x !== clampedX || this.position.y !== clampedY)) {
+          this.animating = true;
+          this.animateTo(this.scale.x, this.scale.x, this.position.x, clampedX, this.position.y, clampedY, 300)
         }
       }
 
