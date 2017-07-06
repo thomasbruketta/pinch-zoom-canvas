@@ -711,11 +711,15 @@
           positionY = this.initialPositionY
         }
 
+        if (this.momentum && this.impetus) {
+          this._destroyImpetus()
+        }
+
         var duration = 300
 
         if (!this.animating) {
           this.animating = true
-          this.animateTo(this.scale.x, zoomToValue, this.position.x, positionX, this.position.y, positionY, duration)
+          this.animateTo(this.scale.x, zoomToValue, this.position.x, positionX, this.position.y, positionY, duration, this._createImpetus)
         }
       } else if (this.startZoom) {
         // Handle zooming out with margins visible
@@ -724,9 +728,13 @@
         var clampedX = Math.max(boundX, Math.min(0, this.position.x))
         var clampedY = Math.max(boundY, Math.min(0, this.position.y))
 
+        if (this.momentum && this.impetus) {
+          this._destroyImpetus()
+        }
+
         if (!this.animating && (this.position.x !== clampedX || this.position.y !== clampedY)) {
           this.animating = true;
-          this.animateTo(this.scale.x, this.scale.x, this.position.x, clampedX, this.position.y, clampedY, 300)
+          this.animateTo(this.scale.x, this.scale.x, this.position.x, clampedX, this.position.y, clampedY, 300, this._createImpetus)
         }
       }
 
